@@ -8,6 +8,7 @@ tsconfig.json
 **/*.test.ts
 pnpm-lock.yaml
 skill/**
+docs/**
 *.vsix
 .gitignore
 CHANGELOG.md
