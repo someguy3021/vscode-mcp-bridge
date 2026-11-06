@@ -1,0 +1,127 @@
+{
+  "name": "vscode-mcp-bridge",
+  "displayName": "VS Code MCP Bridge",
+  "description": "Exposes VS Code as a local MCP server for external AI agents: refactoring-aware file moves, LSP rename/organize-imports, diagnostics and workspace search. Loopback-only with Origin/Host validation.",
+  "version": "0.1.0",
+  "publisher": "someguy3021",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/someguy3021/vscode-mcp-bridge"
+  },
+  "engines": {
+    "vscode": "^1.99.0"
+  },
+  "categories": [
+    "Other",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "mcp",
+    "model context protocol",
+    "ai",
+    "agent",
+    "refactoring",
+    "language server",
+    "codemod"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "vscode-mcp-bridge.start",
+        "title": "MCP Bridge: Start Server"
+      },
+      {
+        "command": "vscode-mcp-bridge.stop",
+        "title": "MCP Bridge: Stop Server"
+      },
+      {
+        "command": "vscode-mcp-bridge.toggle",
+        "title": "MCP Bridge: Toggle Server"
+      },
+      {
+        "command": "vscode-mcp-bridge.showInfo",
+        "title": "MCP Bridge: Show Server Info"
+      }
+    ],
+    "configuration": {
+      "title": "VS Code MCP Bridge",
+      "properties": {
+        "vscode-mcp-bridge.port": {
+          "type": "number",
+          "default": 3101,
+          "minimum": 1024,
+          "maximum": 65535,
+          "description": "HTTP port. Bound to 127.0.0.1 only."
+        },
+        "vscode-mcp-bridge.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start the MCP server when VS Code launches."
+        },
+        "vscode-mcp-bridge.token": {
+          "type": "string",
+          "default": "",
+          "description": "Optional bearer token. When set, clients must send 'Authorization: Bearer <token>'."
+        },
+        "vscode-mcp-bridge.enabledTools": {
+          "type": "object",
+          "default": {
+            "file": true,
+            "edit": true,
+            "analysis": true,
+            "refactor": true,
+            "command": false
+          },
+          "properties": {
+            "file": {
+              "type": "boolean",
+              "description": "Workspace file tools: list/read/create/move/copy/delete/open"
+            },
+            "edit": {
+              "type": "boolean",
+              "description": "Content edit tools: write_file, replace_in_file (exact-match)"
+            },
+            "analysis": {
+              "type": "boolean",
+              "description": "Read-only analysis: diagnostics, symbols, references, search"
+            },
+            "refactor": {
+              "type": "boolean",
+              "description": "LSP-driven refactors: rename_symbol, organize_imports, format_document"
+            },
+            "command": {
+              "type": "boolean",
+              "description": "Run arbitrary VS Code commands (execute_command). Powerful — keep off unless needed."
+            }
+          },
+          "description": "Tool categories exposed over MCP."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.10.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.99.0",
+    "@vscode/vsce": "^3.6.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.0.0"
+  }
+}
