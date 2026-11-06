@@ -74,6 +74,10 @@ For clients that only speak stdio: `npx mcp-remote http://127.0.0.1:3101/mcp`.
 
 The server is live only while VS Code is open with your project; start the agent session *after* opening VS Code.
 
+## Planning docs (English mirror)
+
+Architecture overview, ADRs and the roadmap live in `docs/mirror/` — an English translation of the project's planning documentation (the canonical planning domain, in Russian, with the task registry, is kept private). Start at [docs/mirror/README.md](docs/mirror/README.md).
+
 ## Agent skill
 
 `skill/SKILL.md` teaches coding agents when and how to use the bridge (the refactor loop, tool inventory, gotchas). Install it into your harness's skill directory:
