@@ -3,10 +3,14 @@ import { readConfig, BridgeConfig } from "./config";
 import { BridgeServer } from "./server";
 import { StatusBar } from "./statusBar";
 
+/** Живой сервер текущего окна — нужен deactivate(), который не умеет await. */
+let activeServer: BridgeServer | undefined;
+
 export function activate(context: vscode.ExtensionContext): void {
   const log = vscode.window.createOutputChannel("VS Code MCP Bridge");
   const statusBar = new StatusBar();
   const server = new BridgeServer();
+  activeServer = server;
   let config: BridgeConfig = readConfig();
 
   const start = async (): Promise<void> => {
@@ -36,6 +40,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     log,
     statusBar.item,
+    { dispose: () => void server.stop(log) },
     vscode.commands.registerCommand("vscode-mcp-bridge.start", () => void start()),
     vscode.commands.registerCommand("vscode-mcp-bridge.stop", () => void stop()),
     vscode.commands.registerCommand("vscode-mcp-bridge.toggle", () => void (server.running ? stop() : start())),
@@ -64,7 +69,9 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 }
 
+/** Горячая переустановка/выключение расширения: закрываем сокет синхронно,
+ *  иначе сервер-сирота держит порт и следующий инстанс падает с EADDRINUSE. */
 export function deactivate(): void {
-  // Сервер закрывается синхронно через extension subscriptions-механику ниже;
-  // отдельного хука не требуется, но vscode вызывает deactivate автоматически.
+  activeServer?.disposeSync();
+  activeServer = undefined;
 }
