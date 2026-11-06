@@ -6,6 +6,7 @@ dist/*.map
 esbuild.config.mjs
 tsconfig.json
 **/*.test.ts
+pnpm-lock.yaml
 *.vsix
 .gitignore
 CHANGELOG.md
