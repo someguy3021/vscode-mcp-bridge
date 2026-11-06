@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1 — 2026-11-06
+
+- Сборка переведена с npm на pnpm (lockfile `pnpm-lock.yaml`, `packageManager` pin, CI на pnpm/action-setup).
+
 ## 0.1.0 — 2026-11-06
 
 Первый релиз.

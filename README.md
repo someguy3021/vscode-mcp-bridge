@@ -79,14 +79,14 @@ The server is live only while VS Code is open with your project; start the agent
 ## Development
 
 ```bash
-npm install
-npm run typecheck   # tsc --noEmit, strict
-npm test            # vitest (pure logic: security validators, text matching)
-npm run build       # esbuild bundle -> dist/extension.js
-npx @vscode/vsce package   # -> vscode-mcp-bridge-<ver>.vsix
+pnpm install
+pnpm typecheck      # tsc --noEmit, strict
+pnpm test           # vitest (pure logic: security validators, text matching)
+pnpm build          # esbuild bundle -> dist/extension.js
+pnpm run package    # vsce package -> vscode-mcp-bridge-<ver>.vsix
 ```
 
-Install the produced `.vsix` via `code --install-extension <file>.vsix`. CI (`.github/workflows/build.yml`) runs typecheck → tests → build → package on every push and attaches the `.vsix` as an artifact.
+Package manager is pinned via the `packageManager` field (pnpm ≥ 10; Corepack picks it up automatically). Install the produced `.vsix` via `code --install-extension <file>.vsix`. CI (`.github/workflows/build.yml`) runs typecheck → tests → build → package on every push and attaches the `.vsix` as an artifact.
 
 ## License
 

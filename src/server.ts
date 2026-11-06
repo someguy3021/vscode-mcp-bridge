@@ -131,7 +131,7 @@ export class BridgeServer {
     log: vscode.OutputChannel,
   ): Promise<void> {
     const mcp = new McpServer(
-      { name: "vscode-mcp-bridge", version: "0.1.0" },
+      { name: "vscode-mcp-bridge", version: __EXT_VERSION__ },
       { capabilities: { tools: { listChanged: false } } },
     );
     registerTools({ server: mcp, enabled, log, port });
