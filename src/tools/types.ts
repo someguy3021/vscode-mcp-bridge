@@ -1,5 +1,6 @@
 import type * as vscode from "vscode";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Journal } from "../journal";
 
 export type ToolCategory = "file" | "edit" | "analysis" | "refactor" | "command";
 export type EnabledTools = Record<ToolCategory, boolean>;
@@ -9,6 +10,7 @@ export interface ToolCtx {
   enabled: EnabledTools;
   log: vscode.OutputChannel;
   port: number;
+  journal: Journal;
 }
 
 /** Стандартные обёртки ответа MCP-тулзы (text content). */

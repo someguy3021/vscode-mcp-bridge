@@ -1,5 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { countOccurrences, truncate } from "../pure";
+import { countOccurrences, filterDiffByPath, truncate } from "../pure";
+
+describe("filterDiffByPath", () => {
+  const diff = [
+    "diff --git a/src/a.ts b/src/a.ts",
+    "index 111..222 100644",
+    "--- a/src/a.ts",
+    "+++ b/src/a.ts",
+    "@@ -1,2 +1,2 @@",
+    "-const a = 1;",
+    "+const a = 2;",
+    "diff --git a/src/b.ts b/src/b.ts",
+    "index 333..444 100644",
+    "--- a/src/b.ts",
+    "+++ b/src/b.ts",
+    "@@ -1,2 +1,2 @@",
+    "-const b = 1;",
+    "+const b = 2;",
+  ].join("\n");
+
+  it("оставляет только секции совпавшего пути", () => {
+    const out = filterDiffByPath(diff, "src/a.ts");
+    expect(out).toContain("b/src/a.ts");
+    expect(out).toContain("+const a = 2;");
+    expect(out).not.toContain("const b = 2;");
+  });
+  it("абсолютный Windows-путь матчится по хвосту", () => {
+    const out = filterDiffByPath(diff, "D:\\proj\\src\\a.ts");
+    expect(out).toContain("const a = 2;");
+    expect(out).not.toContain("const b = 2;");
+  });
+  it("нет совпадений — пусто", () => {
+    expect(filterDiffByPath(diff, "nope/x.ts")).toBe("");
+  });
+});
 
 describe("countOccurrences", () => {
   it("считает непересекающиеся вхождения", () => {

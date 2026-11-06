@@ -7,8 +7,9 @@ import { errMsg, fail, ok, ToolCtx } from "./types";
 /**
  * Контентные правки. replace_in_file требует точного совпадения старого текста
  * и по умолчанию ровно одного вхождения — защита от «заменил не там».
+ * Обе тулзы снапшотят файл до правки — undo_last_bridge_edit откатит.
  */
-export function registerEditTools({ server, enabled }: ToolCtx): void {
+export function registerEditTools({ server, enabled, journal }: ToolCtx): void {
   if (!enabled.edit) return;
 
   server.tool(
@@ -21,7 +22,9 @@ export function registerEditTools({ server, enabled }: ToolCtx): void {
     async ({ path: p, content }) => {
       try {
         const uri = resolvePath(p);
+        const snaps = await journal.snapshot([uri]);
         await vscode.workspace.fs.writeFile(uri, Buffer.from(content, "utf8"));
+        await journal.commit("write_file", `перезаписан ${relPath(uri)}`, { snapshots: snaps });
         return ok(`записан ${relPath(uri)} (${Buffer.byteLength(content, "utf8")} байт)`);
       } catch (e) {
         return fail(errMsg(e));
@@ -51,11 +54,13 @@ export function registerEditTools({ server, enabled }: ToolCtx): void {
         }
         const idx = text.indexOf(old_text);
         const range = new vscode.Range(doc.positionAt(idx), doc.positionAt(idx + old_text.length));
+        const snaps = await journal.snapshot([uri]);
         const we = new vscode.WorkspaceEdit();
         we.replace(uri, range, new_text);
         const applied = await vscode.workspace.applyEdit(we);
         if (!applied) return fail("правка не применена");
         if (save ?? true) await doc.save();
+        await journal.commit("replace_in_file", `${relPath(uri)} (строки ${range.start.line + 1}–${range.end.line + 1})`, { snapshots: snaps });
         return ok(`правка применена в ${relPath(uri)} (строки ${range.start.line + 1}–${range.end.line + 1})`);
       } catch (e) {
         return fail(errMsg(e));

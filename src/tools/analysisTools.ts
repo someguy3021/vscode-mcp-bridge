@@ -33,7 +33,12 @@ function flattenSymbols(syms: readonly vscode.DocumentSymbol[], depth = 0, out: 
   return out;
 }
 
-/** Анализ «только читать»: диагностика, символы, навигация, поиск. */
+/** Однозначный элемент иерархии (call/type) в строку «Kind Name — файл:строка». */
+function hierarchyLine(item: vscode.CallHierarchyItem | vscode.TypeHierarchyItem): string {
+  return `${SYMBOL_KINDS[item.kind] ?? "Symbol"} ${item.name} — ${relPath(item.uri)}:${item.range.start.line + 1}`;
+}
+
+/** Анализ «только читать»: диагностика, символы, навигация, поиск, иерархии. */
 export function registerAnalysisTools({ server, enabled, port }: ToolCtx): void {
   if (!enabled.analysis) return;
 
@@ -167,6 +172,77 @@ export function registerAnalysisTools({ server, enabled, port }: ToolCtx): void 
   );
 
   server.tool(
+    "call_hierarchy",
+    "Incoming/outgoing calls for the symbol at the given position: 'incoming' = who calls it (blast radius), 'outgoing' = what it calls.",
+    {
+      path: z.string().describe("File path"),
+      line: z.number().int().min(0).describe("0-based line"),
+      column: z.number().int().min(0).describe("0-based column"),
+      direction: z.enum(["incoming", "outgoing"]).describe("incoming = callers, outgoing = callees"),
+      max_results: z.number().int().positive().optional().describe("Cap, default 100"),
+    },
+    async ({ path: p, line, column, direction, max_results }) => {
+      try {
+        const uri = resolvePath(p);
+        await requireDoc(p);
+        const prepared = await vscode.commands.executeCommand<
+          vscode.CallHierarchyItem | vscode.CallHierarchyItem[] | undefined
+        >("vscode.prepareCallHierarchy", uri, positionArg(line, column));
+        const item = Array.isArray(prepared) ? prepared[0] : prepared;
+        if (!item) return fail("call-hierarchy провайдер не дал символ — позиция не на вызываемом коде?");
+        const lines: string[] = [];
+        if (direction === "incoming") {
+          const calls = await vscode.commands.executeCommand<vscode.CallHierarchyIncomingCall[]>(
+            "vscode.provideIncomingCalls",
+            item,
+          );
+          lines.push(...(calls ?? []).slice(0, max_results ?? 100).map((c) => hierarchyLine(c.from)));
+        } else {
+          const calls = await vscode.commands.executeCommand<vscode.CallHierarchyOutgoingCall[]>(
+            "vscode.provideOutgoingCalls",
+            item,
+          );
+          lines.push(...(calls ?? []).slice(0, max_results ?? 100).map((c) => hierarchyLine(c.to)));
+        }
+        return ok(lines.length ? truncate(lines.join("\n"), 100) : "(вызовов не найдено)");
+      } catch (e) {
+        return fail(errMsg(e));
+      }
+    },
+  );
+
+  server.tool(
+    "type_hierarchy",
+    "Supertypes/subtypes for the type at the given position (interface/class hierarchy).",
+    {
+      path: z.string().describe("File path"),
+      line: z.number().int().min(0).describe("0-based line"),
+      column: z.number().int().min(0).describe("0-based column"),
+      direction: z.enum(["supertypes", "subtypes"]).describe("Which side of the hierarchy"),
+      max_results: z.number().int().positive().optional().describe("Cap, default 100"),
+    },
+    async ({ path: p, line, column, direction, max_results }) => {
+      try {
+        const uri = resolvePath(p);
+        await requireDoc(p);
+        const prepared = await vscode.commands.executeCommand<
+          vscode.TypeHierarchyItem | vscode.TypeHierarchyItem[] | undefined
+        >("vscode.prepareTypeHierarchy", uri, positionArg(line, column));
+        const item = Array.isArray(prepared) ? prepared[0] : prepared;
+        if (!item) return fail("type-hierarchy провайдер не дал символ — позиция не на типе?");
+        const items =
+          direction === "supertypes"
+            ? await vscode.commands.executeCommand<vscode.TypeHierarchyItem[]>("vscode.provideSupertypes", item)
+            : await vscode.commands.executeCommand<vscode.TypeHierarchyItem[]>("vscode.provideSubtypes", item);
+        const lines = (items ?? []).slice(0, max_results ?? 100).map(hierarchyLine);
+        return ok(lines.length ? truncate(lines.join("\n"), 100) : "(иерархия пуста)");
+      } catch (e) {
+        return fail(errMsg(e));
+      }
+    },
+  );
+
+  server.tool(
     "get_hover",
     "Hover info (types, docs) for the symbol at the given 0-based position.",
     {
@@ -211,9 +287,7 @@ export function registerAnalysisTools({ server, enabled, port }: ToolCtx): void 
         // findTextInFiles — proposed-API, поэтому сканируем сами: findFiles + построчный
         // поиск с капами на число файлов, размер файла и число результатов.
         const cap = max_results ?? 100;
-        const re = is_regex
-          ? new RegExp(query, case_sensitive ? "" : "i")
-          : null;
+        const re = is_regex ? new RegExp(query, case_sensitive ? "" : "i") : null;
         const needle = case_sensitive ? query : query.toLowerCase();
         const files = await vscode.workspace.findFiles("**/*", DEFAULT_EXCLUDE, 3000);
         const results: string[] = [];

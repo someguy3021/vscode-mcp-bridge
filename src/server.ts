@@ -5,6 +5,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isAllowedHost, isAllowedOrigin, isAllowedToken } from "./security";
 import { registerTools } from "./tools";
 import { EnabledTools, errMsg } from "./tools/types";
+import { Journal } from "./journal";
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 
@@ -24,8 +25,14 @@ export class BridgeServer {
     return this.running_;
   }
 
-  async start(port: number, token: string, enabled: EnabledTools, log: vscode.OutputChannel): Promise<void> {
-    const httpServer = createServer((req, res) => this.handle(req, res, port, token, enabled, log));
+  async start(
+    port: number,
+    token: string,
+    enabled: EnabledTools,
+    log: vscode.OutputChannel,
+    journal: Journal,
+  ): Promise<void> {
+    const httpServer = createServer((req, res) => this.handle(req, res, port, token, enabled, log, journal));
     await new Promise<void>((resolve, reject) => {
       httpServer.once("error", reject);
       httpServer.listen(port, "127.0.0.1", () => resolve());
@@ -59,6 +66,7 @@ export class BridgeServer {
     token: string,
     enabled: EnabledTools,
     log: vscode.OutputChannel,
+    journal: Journal,
   ): void {
     try {
       const reject = (code: number, message: string): void => {
@@ -107,7 +115,7 @@ export class BridgeServer {
         } catch {
           return reject(400, "invalid JSON");
         }
-        void this.dispatch(body, req, res, port, enabled, log).catch((e) => {
+        void this.dispatch(body, req, res, port, enabled, log, journal).catch((e) => {
           log.appendLine(`[mcp] dispatch error: ${e instanceof Error ? e.stack ?? e.message : String(e)}`);
           reject(500, "internal error");
         });
@@ -129,12 +137,13 @@ export class BridgeServer {
     port: number,
     enabled: EnabledTools,
     log: vscode.OutputChannel,
+    journal: Journal,
   ): Promise<void> {
     const mcp = new McpServer(
       { name: "vscode-mcp-bridge", version: __EXT_VERSION__ },
       { capabilities: { tools: { listChanged: false } } },
     );
-    registerTools({ server: mcp, enabled, log, port });
+    registerTools({ server: mcp, enabled, log, port, journal });
 
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on("close", () => {

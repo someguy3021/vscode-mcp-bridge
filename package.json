@@ -2,7 +2,7 @@
   "name": "vscode-mcp-bridge",
   "displayName": "VS Code MCP Bridge",
   "description": "Exposes VS Code as a local MCP server for external AI agents: refactoring-aware file moves, LSP rename/organize-imports, diagnostics and workspace search. Loopback-only with Origin/Host validation.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "packageManager": "pnpm@10.16.1",
   "publisher": "someguy3021",
   "license": "MIT",

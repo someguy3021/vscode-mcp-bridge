@@ -11,17 +11,20 @@ Inspired by and crediting [juehang/vscode-mcp-server](https://github.com/juehang
 | Category (default) | Tools |
 |---|---|
 | `file` (on) | `list_files`, `read_file`, `create_file`, `move_file` *(WorkspaceEdit — imports updated by the IDE)*, `copy_file`, `delete_file`, `open_file` |
-| `edit` (on) | `write_file`, `replace_in_file` *(exact-match, refuses ambiguous replaces)* |
-| `analysis` (on) | `get_diagnostics`, `search_symbols`, `document_symbols`, `go_to_definition`, `find_references`, `get_hover`, `search_text`, `search_files`, `server_info` |
-| `refactor` (on) | `rename_symbol` *(LSP rename across the project)*, `organize_imports`, `format_document` |
+| `edit` (on) | `write_file`, `replace_in_file` *(exact-match, refuses ambiguous replaces)*, `undo_last_bridge_edit` *(snapshot-based undo of any bridge mutation)* |
+| `analysis` (on) | `get_diagnostics`, `search_symbols`, `document_symbols`, `go_to_definition`, `find_references`, `call_hierarchy`, `type_hierarchy`, `get_hover`, `search_text`, `search_files`, `git_diff`, `edit_journal`, `server_info` |
+| `refactor` (on) | `rename_symbol` *(LSP rename across the project)*, `organize_imports`, `format_document`, `get_code_actions`, `apply_code_action` |
 | `command` (**off**) | `execute_command` — arbitrary VS Code commands; effectively RCE into your IDE, enable deliberately |
 
 The typical agent workflow for a big move/rename:
 
-1. `find_references` / `search_symbols` — scope the blast radius.
-2. `move_file` per path (IDE rewrites imports), or `rename_symbol` per identifier.
+1. `find_references` / `call_hierarchy` / `search_symbols` — scope the blast radius.
+2. `move_file` per path (IDE rewrites imports), or `rename_symbol` per identifier; `get_code_actions` + `apply_code_action` for quickfixes and structural refactors.
 3. `get_diagnostics` after every step — red flags surface *inside* VS Code, not in CI.
-4. `organize_imports` + `format_document` as the finishing pass.
+4. `git_diff` to review exactly what changed; a bad step reverts with `undo_last_bridge_edit`.
+5. `organize_imports` + `format_document` as the finishing pass.
+
+Every mutating tool snapshots affected files before the change (audit trail: `edit_journal` + `journal.jsonl` in extension storage).
 
 ## Security model
 

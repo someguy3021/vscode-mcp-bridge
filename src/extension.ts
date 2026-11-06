@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { readConfig, BridgeConfig } from "./config";
+import { Journal } from "./journal";
 import { BridgeServer } from "./server";
 import { StatusBar } from "./statusBar";
 
@@ -11,13 +12,14 @@ export function activate(context: vscode.ExtensionContext): void {
   const statusBar = new StatusBar();
   const server = new BridgeServer();
   activeServer = server;
+  const journal = new Journal(context.globalStorageUri);
   let config: BridgeConfig = readConfig();
 
   const start = async (): Promise<void> => {
     if (server.running) return;
     config = readConfig();
     try {
-      await server.start(config.port, config.token, config.enabledTools, log);
+      await server.start(config.port, config.token, config.enabledTools, log, journal);
       statusBar.setRunning(config.port, vscode.workspace.name ?? "(no folder)");
     } catch (e) {
       statusBar.setError();

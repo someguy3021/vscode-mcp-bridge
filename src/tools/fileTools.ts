@@ -8,8 +8,9 @@ import { errMsg, fail, ok, ToolCtx } from "./types";
  * Файловые тулзы. Ключевая — move_file: переезд через WorkspaceEdit.renameFile,
  * поэтому language-extensions (TS/Volar/Python…) получают onDidRenameFile и
  * правят импорты/ссылки сами. Это то, чего не может bash-скрипт.
+ * Все мутации предварительно снапшотятся в журнал — undo_last_bridge_edit откатит.
  */
-export function registerFileTools({ server, enabled }: ToolCtx): void {
+export function registerFileTools({ server, enabled, journal }: ToolCtx): void {
   if (!enabled.file) return;
 
   server.tool(
@@ -72,8 +73,10 @@ export function registerFileTools({ server, enabled }: ToolCtx): void {
     async ({ path: p, content }) => {
       try {
         const uri = resolvePath(p);
+        const snaps = await journal.snapshot([uri]);
         await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(uri.fsPath)));
         await vscode.workspace.fs.writeFile(uri, Buffer.from(content, "utf8"));
+        await journal.commit("create_file", `создан ${relPath(uri)}`, { snapshots: snaps });
         return ok(`создан ${relPath(uri)} (${Buffer.byteLength(content, "utf8")} байт)`);
       } catch (e) {
         return fail(errMsg(e));
@@ -93,11 +96,16 @@ export function registerFileTools({ server, enabled }: ToolCtx): void {
       try {
         const src = resolvePath(from);
         const dst = resolvePath(to);
+        const snaps = await journal.snapshot([src, dst]);
         await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(dst.fsPath)));
         const we = new vscode.WorkspaceEdit();
         we.renameFile(src, dst, { overwrite: overwrite ?? false });
         const applied = await vscode.workspace.applyEdit(we);
         if (!applied) return fail("переезд не применён (штатный rename-провайдер отказал)");
+        await journal.commit("move_file", `${relPath(src)} → ${relPath(dst)}`, {
+          snapshots: snaps,
+          inverseMoves: [{ from: src.fsPath, to: dst.fsPath }],
+        });
         return ok(`переехал ${relPath(src)} → ${relPath(dst)}; импорты обновлены IDE там, где провайдеры это поддерживают`);
       } catch (e) {
         return fail(errMsg(e));
@@ -117,8 +125,10 @@ export function registerFileTools({ server, enabled }: ToolCtx): void {
       try {
         const src = resolvePath(from);
         const dst = resolvePath(to);
+        const snaps = await journal.snapshot([dst]);
         await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(dst.fsPath)));
         await vscode.workspace.fs.copy(src, dst, { overwrite: overwrite ?? false });
+        await journal.commit("copy_file", `копия ${relPath(src)} → ${relPath(dst)}`, { snapshots: snaps });
         return ok(`скопирован ${relPath(src)} → ${relPath(dst)}`);
       } catch (e) {
         return fail(errMsg(e));
@@ -128,7 +138,7 @@ export function registerFileTools({ server, enabled }: ToolCtx): void {
 
   server.tool(
     "delete_file",
-    "Delete a file or folder (recursive). Irreversible — no recycle bin.",
+    "Delete a file or folder (recursive). Irreversible — no recycle bin, but the bridge journal keeps a snapshot for undo_last_bridge_edit.",
     {
       path: z.string().describe("Path to delete"),
       recursive: z.boolean().optional().describe("Delete folders recursively, default true"),
@@ -136,8 +146,23 @@ export function registerFileTools({ server, enabled }: ToolCtx): void {
     async ({ path: p, recursive }) => {
       try {
         const uri = resolvePath(p);
+        const targets = [uri];
+        try {
+          const stat = await vscode.workspace.fs.stat(uri);
+          if (stat.type & vscode.FileType.Directory) {
+            const rel = relPath(uri).replace(/\\/g, "/");
+            if (rel && !rel.endsWith(":")) {
+              const inner = await vscode.workspace.findFiles(`${rel}/**`, undefined, 5000);
+              if (inner.length) targets.push(...inner);
+            }
+          }
+        } catch {
+          /* stat не удался — пусть delete вернёт ошибку как раньше */
+        }
+        const snaps = await journal.snapshot(targets);
         await vscode.workspace.fs.delete(uri, { recursive: recursive ?? true, useTrash: false });
-        return ok(`удалён ${relPath(uri)}`);
+        await journal.commit("delete_file", `удалён ${relPath(uri)} (файлов в снапшоте: ${snaps.length})`, { snapshots: snaps });
+        return ok(`удалён ${relPath(uri)} (снапшот: ${snaps.length} файл(ов) — откат через undo_last_bridge_edit)`);
       } catch (e) {
         return fail(errMsg(e));
       }
