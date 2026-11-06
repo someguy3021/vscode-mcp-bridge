@@ -74,6 +74,16 @@ For clients that only speak stdio: `npx mcp-remote http://127.0.0.1:3101/mcp`.
 
 The server is live only while VS Code is open with your project; start the agent session *after* opening VS Code.
 
+## Agent skill
+
+`skill/SKILL.md` teaches coding agents when and how to use the bridge (the refactor loop, tool inventory, gotchas). Install it into your harness's skill directory:
+
+```bash
+cp skill/SKILL.md ~/.agents/skills/vscode-mcp-bridge/SKILL.md   # zcode / Claude-style harnesses
+```
+
+The canonical copy lives in this repository — re-copy after upgrades.
+
 ## Requirements
 
 - VS Code ≥ 1.99

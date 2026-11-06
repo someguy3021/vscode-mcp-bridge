@@ -7,6 +7,7 @@ esbuild.config.mjs
 tsconfig.json
 **/*.test.ts
 pnpm-lock.yaml
+skill/**
 *.vsix
 .gitignore
 CHANGELOG.md
